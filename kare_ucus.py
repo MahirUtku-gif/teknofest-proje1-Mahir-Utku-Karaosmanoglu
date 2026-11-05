@@ -4,6 +4,7 @@
 MAVProxy, --out udp:127.0.0.1:14550 ile bu betiğe veri yönlendirir.
 """
 import csv
+import math
 import time
 
 from pymavlink import mavutil
@@ -59,20 +60,40 @@ def main():
             mavutil.mavlink.MAV_CMD_NAV_TAKEOFF, 0, 0, 0, 0, 0, 0, 0, IRTIFA)
 
         # TODO 1: irtifa IRTIFA'nın %95'ine ulaşana kadar kayit_al() ile bekle.
+        irtifa = 0.0
+        while irtifa < IRTIFA * 0.95:
+            sonuc = kayit_al(iha, yazici, baslangic)
+            if sonuc is not None:
+                irtifa = sonuc
+        print("Kalkış tamam:", round(irtifa, 1), "m")
+
 
         # TODO 2: karenin 4 köşesini (kuzey, doğu) listesi olarak tanımla.
+        koseler = [(KENAR, 0), (KENAR, KENAR), (0, KENAR), (0, 0)]
         # İpucu: ilk köşe (KENAR, 0) olabilir. Son köşe kalkış noktası (0, 0).
-        koseler = []
+        
 
         for kuzey, dogu in koseler:
             konuma_git(iha, kuzey, dogu, -IRTIFA)
             # TODO 3: köşeye ulaşana kadar bekle ve bu sırada kayıt al.
             # İpucu: LOCAL_POSITION_NED mesajındaki x, y ile hedef arasındaki
             # mesafe 1 m'nin altına inince bir sonraki köşeye geç.
+            while True:
+                kayit_al(iha, yazici, baslangic)
+                pos = iha.recv_match(type="LOCAL_POSITION_NED", blocking=True, timeout=1)
+                if pos is None:
+                    continue
+                if math.hypot(pos.x - kuzey, pos.y - dogu) < 1.0:
+                    break
             print("Köşeye ulaşıldı:", kuzey, dogu)
 
         mod_ayarla(iha, "LAND")
         # TODO 4: irtifa 0,3 m'nin altına inene kadar kayıt almaya devam et.
+        irtifa = IRTIFA
+        while irtifa > 0.3:
+            sonuc = kayit_al(iha, yazici, baslangic)
+            if sonuc is not None:
+                irtifa = sonuc
         print("İniş tamam, kayıt: ucus_kaydi.csv")
 
 
